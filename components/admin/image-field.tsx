@@ -3,7 +3,7 @@
 import { upload } from "@vercel/blob/client";
 import Image from "next/image";
 import { useId, useRef, useState } from "react";
-import { isExternalUrl, isOptimizableImageUrl, isSitePath } from "@/lib/urls";
+import { isAllowedImageUrl, isOptimizableImageUrl } from "@/lib/urls";
 
 /** Mirrors lib/admin/blob.ts (which is server-only because it imports the Blob SDK). */
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -49,7 +49,8 @@ export function ImageField({
 
   const fieldErrors = [...(errors ?? []), ...(uploadError ? [uploadError] : [])];
   const hasErrors = fieldErrors.length > 0;
-  const previewable = url !== "" && (isSitePath(url) || isExternalUrl(url));
+  // Only addresses the server will accept get a preview; anything else would show a broken image.
+  const previewable = url !== "" && isAllowedImageUrl(url);
 
   async function handleFile(file: File) {
     setUploadError(null);
@@ -111,7 +112,7 @@ export function ImageField({
             type="text"
             inputMode="url"
             className="field-input"
-            placeholder="/images/… or https://…"
+            placeholder="/images/…"
             value={url}
             onChange={(event) => setUrl(event.target.value.trim())}
             aria-invalid={hasErrors ? true : undefined}
@@ -156,8 +157,8 @@ export function ImageField({
           <p id={helpId} className="text-sm text-asphalt/70">
             {help ??
               (uploadEnabled
-                ? "Upload a JPEG, PNG, or WebP up to 10 MB, or paste an image address."
-                : "Paste an image address. Uploads are unavailable until BLOB_READ_WRITE_TOKEN is set.")}
+                ? "Upload a JPEG, PNG, WebP, GIF, or AVIF up to 10 MB, or use an image path from the site (/images/…)."
+                : "Use an image path from the site (/images/…). Uploads are unavailable until BLOB_READ_WRITE_TOKEN is set.")}
           </p>
           {hasErrors ? (
             <p id={errorId} className="text-sm font-semibold text-red-700">
