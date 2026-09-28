@@ -2,7 +2,7 @@
 
 import { upload } from "@vercel/blob/client";
 import Image from "next/image";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { isAllowedImageUrl, isOptimizableImageUrl } from "@/lib/urls";
 
 /** Mirrors lib/admin/blob.ts (which is server-only because it imports the Blob SDK). */
@@ -43,9 +43,27 @@ export function ImageField({
   const errorId = `${inputId}-error`;
   const helpId = `${inputId}-help`;
   const fileInput = useRef<HTMLInputElement>(null);
+  const urlInput = useRef<HTMLInputElement>(null);
   const [url, setUrl] = useState(defaultValue ?? "");
   const [progress, setProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const uploading = progress !== null;
+
+  // While an upload runs, the text input still holds the previous address, so saving now
+  // would store the old image and orphan the new file. Hold the form's submit until the
+  // upload finishes. A capture listener on the form runs before React's action handler.
+  useEffect(() => {
+    const form = urlInput.current?.form;
+    if (!uploading || !form) return;
+    const holdSubmit = (event: SubmitEvent) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setUploadError("The image is still uploading. Save again once the upload finishes.");
+    };
+    form.addEventListener("submit", holdSubmit, true);
+    return () => form.removeEventListener("submit", holdSubmit, true);
+  }, [uploading]);
 
   const fieldErrors = [...(errors ?? []), ...(uploadError ? [uploadError] : [])];
   const hasErrors = fieldErrors.length > 0;
@@ -71,6 +89,7 @@ export function ImageField({
         onUploadProgress: (event) => setProgress(event.percentage),
       });
       setUrl(blob.url);
+      setUploadError(null);
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "Upload failed. Please try again.");
     } finally {
@@ -107,6 +126,7 @@ export function ImageField({
         </div>
         <div className="min-w-0 flex-1 space-y-2">
           <input
+            ref={urlInput}
             id={inputId}
             name={name}
             type="text"
